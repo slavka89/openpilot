@@ -13,19 +13,19 @@ from typing import BinaryIO, Iterator, List, Optional, Tuple, Union
 
 from cereal import log
 import cereal.messaging as messaging
-from common.api import Api
-from common.params import Params
-from common.realtime import set_core_affinity
-from system.hardware import TICI
-from system.loggerd.xattr_cache import getxattr, setxattr
-from system.loggerd.config import ROOT
-from system.swaglog import cloudlog
+from openpilot.common.api import Api
+from openpilot.common.params import Params
+from openpilot.common.realtime import set_core_affinity
+from openpilot.system.hardware import TICI
+from openpilot.system.hardware.hw import Paths
+from openpilot.system.loggerd.xattr_cache import getxattr, setxattr
+from openpilot.common.swaglog import cloudlog
 
 NetworkType = log.DeviceState.NetworkType
 UPLOAD_ATTR_NAME = 'user.upload'
 UPLOAD_ATTR_VALUE = b'1'
 
-UPLOAD_QLOG_QCAM_MAX_SIZE = 100 * 1e6  # MB
+UPLOAD_QLOG_QCAM_MAX_SIZE = 5 * 1e6  # MB
 
 allow_sleep = bool(os.getenv("UPLOADER_SLEEP", "1"))
 force_wifi = os.getenv("FORCEWIFI") is not None
@@ -46,11 +46,11 @@ class FakeResponse:
 UploadResponse = Union[requests.Response, FakeResponse]
 
 def get_directory_sort(d: str) -> List[str]:
-  return list(map(lambda s: s.rjust(10, '0'), d.rsplit('--', 1)))
+  return [s.rjust(10, '0') for s in d.rsplit('--', 1)]
 
 def listdir_by_creation(d: str) -> List[str]:
   try:
-    paths = os.listdir(d)
+    paths = [f for f in os.listdir(d) if os.path.isdir(os.path.join(d, f))]
     paths = sorted(paths, key=get_directory_sort)
     return paths
   except OSError:
@@ -77,9 +77,6 @@ class Uploader:
     self.last_resp: Optional[UploadResponse] = None
     self.last_exc: Optional[Tuple[Exception, str]] = None
 
-    self.immediate_size = 0
-    self.immediate_count = 0
-
     # stats for last successfully uploaded file
     self.last_time = 0.0
     self.last_speed = 0.0
@@ -88,17 +85,9 @@ class Uploader:
     self.immediate_folders = ["crash/", "boot/"]
     self.immediate_priority = {"qlog": 0, "qlog.bz2": 0, "qcamera.ts": 1}
 
-  def get_upload_sort(self, name: str) -> int:
-    if name in self.immediate_priority:
-      return self.immediate_priority[name]
-    return 1000
-
   def list_upload_files(self) -> Iterator[Tuple[str, str, str]]:
     if not os.path.isdir(self.root):
       return
-
-    self.immediate_size = 0
-    self.immediate_count = 0
 
     for logname in listdir_by_creation(self.root):
       path = os.path.join(self.root, logname)
@@ -110,7 +99,7 @@ class Uploader:
       if any(name.endswith(".lock") for name in names):
         continue
 
-      for name in sorted(names, key=self.get_upload_sort):
+      for name in sorted(names, key=lambda n: self.immediate_priority.get(n, 1000)):
         key = os.path.join(logname, name)
         fn = os.path.join(path, name)
         # skip files already uploaded
@@ -121,13 +110,6 @@ class Uploader:
           is_uploaded = True  # deleter could have deleted
         if is_uploaded:
           continue
-
-        try:
-          if name in self.immediate_priority:
-            self.immediate_count += 1
-            self.immediate_size += os.path.getsize(fn)
-        except OSError:
-          pass
 
         yield name, key, fn
 
@@ -211,7 +193,8 @@ class Uploader:
         else:
           content_length = int(stat.request.headers.get("Content-Length", 0))
           self.last_speed = (content_length / 1e6) / self.last_time
-          cloudlog.event("upload_success", key=key, fn=fn, sz=sz, content_length=content_length, network_type=network_type, metered=metered, speed=self.last_speed)
+          cloudlog.event("upload_success", key=key, fn=fn, sz=sz, content_length=content_length,
+                         network_type=network_type, metered=metered, speed=self.last_speed)
         success = True
       else:
         success = False
@@ -226,24 +209,31 @@ class Uploader:
 
     return success
 
-  def get_msg(self):
-    msg = messaging.new_message("uploaderState")
-    us = msg.uploaderState
-    us.immediateQueueSize = int(self.immediate_size / 1e6)
-    us.immediateQueueCount = self.immediate_count
-    us.lastTime = self.last_time
-    us.lastSpeed = self.last_speed
-    us.lastFilename = self.last_filename
-    return msg
+
+  def step(self, network_type: int, metered: bool) -> bool:
+    d = self.next_file_to_upload()
+    if d is None:
+      return True
+
+    name, key, fn = d
+
+    # qlogs and bootlogs need to be compressed before uploading
+    if key.endswith(('qlog', 'rlog')) or (key.startswith('boot/') and not key.endswith('.bz2')):
+      key += ".bz2"
+
+    return self.upload(name, key, fn, network_type, metered)
 
 
-def uploader_fn(exit_event: threading.Event) -> None:
+def main(exit_event: Optional[threading.Event] = None) -> None:
+  if exit_event is None:
+    exit_event = threading.Event()
+
   try:
     set_core_affinity([0, 1, 2, 3])
   except Exception:
     cloudlog.exception("failed to set core affinity")
 
-  clear_locks(ROOT)
+  clear_locks(Paths.log_root())
 
   params = Params()
   dongle_id = params.get("DongleId", encoding='utf8')
@@ -256,8 +246,7 @@ def uploader_fn(exit_event: threading.Event) -> None:
     cloudlog.warning("NVME not mounted")
 
   sm = messaging.SubMaster(['deviceState'])
-  pm = messaging.PubMaster(['uploaderState'])
-  uploader = Uploader(dongle_id, ROOT)
+  uploader = Uploader(dongle_id, Paths.log_root())
 
   backoff = 0.1
   while not exit_event.is_set():
@@ -269,31 +258,14 @@ def uploader_fn(exit_event: threading.Event) -> None:
         time.sleep(60 if offroad else 5)
       continue
 
-    d = uploader.next_file_to_upload()
-    if d is None:  # Nothing to upload
-      if allow_sleep:
-        time.sleep(60 if offroad else 5)
-      continue
+    success = uploader.step(sm['deviceState'].networkType.raw, sm['deviceState'].networkMetered)
 
-    name, key, fn = d
-
-    # qlogs and bootlogs need to be compressed before uploading
-    if key.endswith(('qlog', 'rlog')) or (key.startswith('boot/') and not key.endswith('.bz2')):
-      key += ".bz2"
-
-    success = uploader.upload(name, key, fn, sm['deviceState'].networkType.raw, sm['deviceState'].networkMetered)
     if success:
       backoff = 0.1
     elif allow_sleep:
       cloudlog.info("upload backoff %r", backoff)
       time.sleep(backoff + random.uniform(0, backoff))
       backoff = min(backoff*2, 120)
-
-    pm.send("uploaderState", uploader.get_msg())
-
-
-def main() -> None:
-  uploader_fn(threading.Event())
 
 
 if __name__ == "__main__":
