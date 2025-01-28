@@ -114,6 +114,37 @@
     </message>
 </context>
 <context>
+    <name>DeveloperPanel</name>
+    <message>
+        <source>Joystick Debug Mode</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Longitudinal Maneuver Mode</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>openpilot Longitudinal Control (Alpha)</source>
+        <translation type="unfinished">openpilot 縱向控制 (Alpha 版)</translation>
+    </message>
+    <message>
+        <source>WARNING: openpilot longitudinal control is in alpha for this car and will disable Automatic Emergency Braking (AEB).</source>
+        <translation type="unfinished">警告：此車輛的 openpilot 縱向控制功能目前處於 Alpha 版本，使用此功能將會停用自動緊急煞車（AEB）功能。</translation>
+    </message>
+    <message>
+        <source>On this car, openpilot defaults to the car&apos;s built-in ACC instead of openpilot&apos;s longitudinal control. Enable this to switch to openpilot longitudinal control. Enabling Experimental mode is recommended when enabling openpilot longitudinal control alpha.</source>
+        <translation type="unfinished">在這輛車上，openpilot 預設使用車輛內建的主動巡航控制（ACC），而非 openpilot 的縱向控制。啟用此項功能可切換至 openpilot 的縱向控制。當啟用 openpilot 縱向控制 Alpha 版本時，建議同時啟用實驗性模式（Experimental mode）。</translation>
+    </message>
+    <message>
+        <source>Enable ADB</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>ADB (Android Debug Bridge) allows connecting to your device over USB or over the network. See https://docs.comma.ai/how-to/connect-to-comma for more info.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>DevicePanel</name>
     <message>
         <source>Dongle ID</source>
@@ -444,6 +475,10 @@
         <source>Bookmark connect.comma.ai to your home screen to use it like an app</source>
         <translation>將 connect.comma.ai 加入您的主螢幕，以便像手機 App 一樣使用它</translation>
     </message>
+    <message>
+        <source>Please connect to Wi-Fi to complete initial pairing</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>ParamControl</name>
@@ -597,6 +632,10 @@ This may take up to a minute.</source>
     <message>
         <source>Software</source>
         <translation>軟體</translation>
+    </message>
+    <message>
+        <source>Developer</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -989,18 +1028,6 @@ This may take up to a minute.</source>
     <message>
         <source>openpilot longitudinal control may come in a future update.</source>
         <translation>openpilot 縱向控制可能會在未來的更新中提供。</translation>
-    </message>
-    <message>
-        <source>openpilot Longitudinal Control (Alpha)</source>
-        <translation>openpilot 縱向控制 (Alpha 版)</translation>
-    </message>
-    <message>
-        <source>WARNING: openpilot longitudinal control is in alpha for this car and will disable Automatic Emergency Braking (AEB).</source>
-        <translation>警告：此車輛的 openpilot 縱向控制功能目前處於 Alpha 版本，使用此功能將會停用自動緊急煞車（AEB）功能。</translation>
-    </message>
-    <message>
-        <source>On this car, openpilot defaults to the car&apos;s built-in ACC instead of openpilot&apos;s longitudinal control. Enable this to switch to openpilot longitudinal control. Enabling Experimental mode is recommended when enabling openpilot longitudinal control alpha.</source>
-        <translation>在這輛車上，openpilot 預設使用車輛內建的主動巡航控制（ACC），而非 openpilot 的縱向控制。啟用此項功能可切換至 openpilot 的縱向控制。當啟用 openpilot 縱向控制 Alpha 版本時，建議同時啟用實驗性模式（Experimental mode）。</translation>
     </message>
     <message>
         <source>Aggressive</source>

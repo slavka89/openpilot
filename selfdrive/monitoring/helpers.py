@@ -1,15 +1,15 @@
 from math import atan2
+import numpy as np
 
-from cereal import car
+from cereal import car, log
 import cereal.messaging as messaging
 from openpilot.selfdrive.selfdrived.events import Events
-from openpilot.common.numpy_fast import interp
 from openpilot.common.realtime import DT_DMON
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.stat_live import RunningStatFilter
 from openpilot.common.transformations.camera import DEVICE_CAMERAS
 
-EventName = car.OnroadEvent.EventName
+EventName = log.OnroadEvent.EventName
 
 # ******************************************************************************************
 #  NOTE: To fork maintainers.
@@ -33,8 +33,8 @@ class DRIVER_MONITOR_SETTINGS:
     self._SG_THRESHOLD = 0.9
     self._BLINK_THRESHOLD = 0.865
 
-    self._EE_THRESH11 = 0.25
-    self._EE_THRESH12 = 7.5
+    self._EE_THRESH11 = 0.4
+    self._EE_THRESH12 = 15.0
     self._EE_MAX_OFFSET1 = 0.06
     self._EE_MIN_OFFSET1 = 0.025
     self._EE_THRESH21 = 0.01
@@ -205,10 +205,10 @@ class DriverMonitoring:
     bp = model_data.meta.disengagePredictions.brakeDisengageProbs[0] # brake disengage prob in next 2s
     k1 = max(-0.00156*((car_speed-16)**2)+0.6, 0.2)
     bp_normal = max(min(bp / k1, 0.5),0)
-    self.pose.cfactor_pitch = interp(bp_normal, [0, 0.5],
+    self.pose.cfactor_pitch = np.interp(bp_normal, [0, 0.5],
                                            [self.settings._POSE_PITCH_THRESHOLD_SLACK,
                                             self.settings._POSE_PITCH_THRESHOLD_STRICT]) / self.settings._POSE_PITCH_THRESHOLD
-    self.pose.cfactor_yaw = interp(bp_normal, [0, 0.5],
+    self.pose.cfactor_yaw = np.interp(bp_normal, [0, 0.5],
                                            [self.settings._POSE_YAW_THRESHOLD_SLACK,
                                             self.settings._POSE_YAW_THRESHOLD_STRICT]) / self.settings._POSE_YAW_THRESHOLD
 
